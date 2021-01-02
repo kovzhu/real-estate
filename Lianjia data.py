@@ -7,12 +7,21 @@ import time
 from tools import WriteToExcel, WriteToExcel_df
 
 
-
-def GetPages(url):
+def make_soup(url):
     headers ={'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.129 Safari/537.36'}
     cookies ={'Cookie': 'BAIDUID=A467EBC2C2D0C1F5CE71C86F2D851B89:FG=1; PSTM=1569895226; BIDUPSID=9BD73512109ADEBC79D0E6031A361FF2; ab_jid=3401447befc2a1f1fb58e1332e7a70a45049; ab_jid=3401447befc2a1f1fb58e1332e7a70a45049; ab_jid_BFESS=3401447befc2a1f1fb58e1332e7a70a45049; BDORZ=B490B5EBF6F3CD402E515D22BCDA1598'}
     text = requests.get(url, headers=headers, cookies = cookies).text
     soup = bs(text, features='lxml')
+    return soup
+
+def get_page_number(url):
+    soup= make_soup(url)
+    temp=soup.find_all(name='div', attrs={'class':'page-box house-lst-page-box'})
+    pages = int(re.findall('{"totalPage":(\d*),',temp[0].get('page-data'))[0])
+    return pages
+    
+def GetPages(url):
+    soup = make_soup(url)
     list_of_info = soup.findAll(name='ul', attrs={'class':'listContent'})
     
     # pages = re.findall('<a href="/ershoufang/pg2c1111027382441rs国际城" data-page="2">2</a>')
@@ -37,10 +46,13 @@ def GetPages(url):
     decoration = [i.text.split('|')[1] for i in houseinfo]
     date =[]
     for i in dealdate:
-        if len(i.text.split('.'))==2:
-            date.append(datetime.strptime(i.text,'%Y.%m'))
-        else:
-            date.append(datetime.strptime(i.text,'%Y.%m.%d'))
+        try:
+            if len(i.text.split('.'))==2:
+                date.append(datetime.strptime(i.text,'%Y.%m'))
+            else:
+                date.append(datetime.strptime(i.text,'%Y.%m.%d'))
+        except:
+            date.append('N/A')
     year = [i.year for i in date]
     month = [i.month for i in date]
     price = [i.text[:-1] for i in totalprice]
@@ -132,20 +144,35 @@ def UrlGenerator(block, pages):
             url = url_part1+i+r'c1111041153546/?sug=世华泊郡'
             url_list.append(url)
     elif block == 'fxdd':
+        for i in pageinfo:
             url = url_part1+i+r'c1111027379985/?sug=天润福熙大道'
             url_list.append(url)        
     return url_list
 
+def url_generator_for_all(url, pages):
+    pageinfo = ['']
+    url_list = []
+    if pages>2:
+        for i in range(2,pages+1):
+            pageinfo.append('pg'+str(i)+r'/')
+        for i in pageinfo:
+            url_full = url + i
+            url_list.append(url_full)
+        return url_list
+    elif pages == 1:
+        url_list.append(url)
+    elif pages ==2:
+        url_list.append(url)
+        url_list.append(url+'pg2/')
+    return url_list
+        
 
-def main():
-    # url = r'https://bj.lianjia.com/ershoufang/c1111027382441rs%E5%9B%BD%E9%99%85%E5%9F%8E/'
+
+def Get_data_in_beiyuan():
+        # url = r'https://bj.lianjia.com/ershoufang/c1111027382441rs%E5%9B%BD%E9%99%85%E5%9F%8E/'
     url_for_sale= r'https://bj.lianjia.com/ershoufang/c1111027382441/?sug=%E4%B8%AD%E5%9B%BD%E9%93%81%E5%BB%BA%E5%9B%BD%E9%99%85%E5%9F%8E'
     url_historical = r'https://bj.lianjia.com/chengjiao/c1111027382441/?sug=%E4%B8%AD%E5%9B%BD%E9%93%81%E5%BB%BA%E5%9B%BD%E9%99%85%E5%9F%8E'
-    pages_gjc = 13
-    pages_rzgg =11
-    pages_shbj =14
-    pages_hmc = 50
-    
+
     blocks ={
         'gjc':13,
         'rzgg':11,
@@ -154,12 +181,6 @@ def main():
         'fxdd':9
         }
     
-    # url_historical_list=[]
-    # url_historical_list.append(url_historical)
-    # for i in range(2,pages+1):
-    #     url = r'https://bj.lianjia.com/chengjiao/'+'pg'+str(i)+r'c1111027382441/?sug=%E4%B8%AD%E5%9B%BD%E9%93%81%E5%BB%BA%E5%9B%BD%E9%99%85%E5%9F%8E'
-    #     url_historical_list.append(url)
-    # data_list = []
     data =pd.DataFrame()
     for block in blocks:
         for i in UrlGenerator(block,blocks[block]):
@@ -172,20 +193,28 @@ def main():
     with pd.ExcelWriter(filename) as writer:
         data.to_excel(writer, sheet_name = datetime.today().strftime('%Y-%m-%d'))
     
-    # data_rzgg =pd.DataFrame()
+def main():
+    url_base =r'https://bj.lianjia.com/chengjiao/'
+    soup_base = make_soup(url_base)
+    #get the links in the historical page by region
+    links_soup = soup_base.findAll(name ='div',attrs={'data-role':'ershoufang'})
+    links = [i.get('href') for i in links_soup[0].find_all('a')]
+    links_region = [url_base+i[11:] for i in links]
     
-    # for i in UrlGenerator('gjc',pages_gjc):
-    #     pagedata = GetPages(i)
-    #     data_gjc = pd.concat([data_gjc,pagedata])
     
-    # data_list.append(data_gjc)    
-    
-    
-    # WriteToExcel('lianjia','lianjia', data)    
+    data=pd.DataFrame()
+    for link in links_region:
+        region = link.split('/')[-2]
+        pages = get_page_number(link)
+        all_urls = url_generator_for_all(link,pages)
+        for i in all_urls:
+            pagedata = GetPages(i)
+            pagedata.loc[:,'region']=region
+            data = pd.concat([data,pagedata])
 
-    # Price = PriceInfo(url,headers,cookies)
-    # with pd.ExcelWriter('Lianjia historical info.xlsx') as Writer:
-    #     data.to_excel(Writer, sheet_name = 'Lianjia')
+    filename = 'lianjia historical data beijing all'+' '+ time.ctime().replace(':','_')+'.xlsx'
+    with pd.ExcelWriter(filename) as writer:
+        data.to_excel(writer, sheet_name = datetime.today().strftime('%Y-%m-%d'))
 
 
 
