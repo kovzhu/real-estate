@@ -8,6 +8,7 @@ from tools import WriteToExcel, WriteToExcel_df
 
 
 def make_soup(url):
+    #parse a html page for analysi with bs4
     headers ={'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.129 Safari/537.36'}
     cookies ={'Cookie': 'BAIDUID=A467EBC2C2D0C1F5CE71C86F2D851B89:FG=1; PSTM=1569895226; BIDUPSID=9BD73512109ADEBC79D0E6031A361FF2; ab_jid=3401447befc2a1f1fb58e1332e7a70a45049; ab_jid=3401447befc2a1f1fb58e1332e7a70a45049; ab_jid_BFESS=3401447befc2a1f1fb58e1332e7a70a45049; BDORZ=B490B5EBF6F3CD402E515D22BCDA1598'}
     text = requests.get(url, headers=headers, cookies = cookies).text
@@ -15,12 +16,18 @@ def make_soup(url):
     return soup
 
 def get_page_number(url):
+    #get the number of pages for a region or sub-region
     soup= make_soup(url)
     temp=soup.find_all(name='div', attrs={'class':'page-box house-lst-page-box'})
-    pages = int(re.findall('{"totalPage":(\d*),',temp[0].get('page-data'))[0])
+    try:
+        pages = int(re.findall('{"totalPage":(\d*),',temp[0].get('page-data'))[0])
+    except:
+    # there is case that there's no data for a page (like in Changping Baishan)
+        pages = 1
     return pages
     
 def GetPages(url):
+    # get all the data in a page and store it in a dataframe (data), and return the data
     soup = make_soup(url)
     list_of_info = soup.findAll(name='ul', attrs={'class':'listContent'})
     
@@ -92,10 +99,10 @@ def GetPages(url):
         except:
             average_unit_price.append('N/A')
         
-    House_info = [i.text for i in dealhouseinfo]
-    deal_info = [i.text for i in dealquote]
-    quote = [re.findall('牌(\d*)', i.text) for i in dealquote]
-    cycletime = [re.findall('期(\d*)', i.text) for i in dealquote]
+    # House_info = [i.text for i in dealhouseinfo]
+    # deal_info = [i.text for i in dealquote]
+    # quote = [re.findall('牌(\d*)', i.text) for i in dealquote]
+    # cycletime = [re.findall('期(\d*)', i.text) for i in dealquote]
     
     data = pd.DataFrame({'block':block, 
                          'rooms':rooms,
@@ -119,6 +126,7 @@ def GetPages(url):
     return data
 
 def url_generator_for_all(url, pages):
+    #generate a list of urls for all the pages in a region/sub-region
     pageinfo = ['']
     url_list = []
     if pages>2:
@@ -135,7 +143,9 @@ def url_generator_for_all(url, pages):
         url_list.append(url+'pg2/')
     return url_list
         
+
 def get_region_links(url_base):
+    #get the list of urls for all the regions in a city, like Haidian, Chaoyang, etc.
     soup_base = make_soup(url_base)
     #get the links in the historical page by region
     links_soup = soup_base.findAll(name ='div',attrs={'data-role':'ershoufang'})
@@ -146,6 +156,7 @@ def get_region_links(url_base):
     return region_links   
 
 def get_subregion_links(url_base,link):
+    #for each region (like Changyang),get the list of links for its sub-regions (like Laiguangyin)
     region_soup = make_soup(link)
     links_temp = region_soup.find_all(name ='div', attrs={'data-role':'ershoufang'})[0].find_all('div')[1].find_all('a')
     links_subregion_short = [i.get('href') for i in links_temp]
@@ -155,9 +166,8 @@ def get_subregion_links(url_base,link):
     return subregion_links    
 
 def get_regional_data(url_base,region, link):
+    #get all the data in a region, by looping its subregions
     data=pd.DataFrame()
-    # city = re.findall('https://(\w*).lianjia', url_base)[0]
-    # region =regions[links_region.index(link)]
     subregion_links = get_subregion_links(url_base,link)
     
     # loop for every sub-region in each region
@@ -180,11 +190,13 @@ def get_regional_data(url_base,region, link):
 
     
 def get_all_data(url_base):
+    #Get all regional data as dataframes, and store all the dfs in a list
     region_links =get_region_links(url_base)
-    # data = pd.DataFrame()
-    # loop for every link in the region:
+    data_by_region = []
     for region in region_links:
-        get_regional_data(url_base,region,region_links[region])
+        regional_data = get_regional_data(url_base,region,region_links[region])
+        data_by_region.append(regional_data)
+    return data_by_region
 
 def city_name(url):
     city_code = re.findall('https://(\w*).',url)[0]
@@ -205,10 +217,12 @@ def main():
     url_base_shanghai =r'https://sh.lianjia.com/chengjiao/'
     url_base_chengdu =r'https://cd.lianjia.com/chengjiao/'
     url_base_shenzhen =r'https://sz.lianjia.com/chengjiao/'
-    #data = get_all_data(url_base_beijing)
+    
+    city = city_name(url_base_beijing) 
+    
+    #Get data by region and store it in excel
     links = get_region_links(url_base_beijing)
-    city = city_name(url_base_beijing)
-    region = '朝阳'
+    region = '昌平'
     # beijng valid regions:
     #     东城
     #     西城
@@ -232,7 +246,15 @@ def main():
     with pd.ExcelWriter(filename) as writer:
         data.to_excel(writer, sheet_name = datetime.today().strftime('%Y-%m-%d'))    
 
-
+    #get all data in a city and store them in excel
+    # datalist = get_all_data(url_base_beijing)
+    
+    # filename = 'lianjia historical data '+city+ datetime.now().strftime('%Y-%m-%d %H-%M-%S')+'.xlsx'
+    # with pd.ExcelWriter(filename) as writer:
+    #     # writer.book = load_workbook(filename)
+    #     for i in range(0,len(datalist)):
+    #         datalist[i].to_excel(writer, sheet_name = 'sheet'+str(i))
+    
 
 if __name__ == '__main__':
     main()
