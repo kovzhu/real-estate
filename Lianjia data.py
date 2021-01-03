@@ -3,8 +3,7 @@ import re
 import pandas as pd
 from bs4 import BeautifulSoup as bs
 from datetime import datetime
-import time
-from tools import WriteToExcel, WriteToExcel_df
+
 
 
 def make_soup(url):
