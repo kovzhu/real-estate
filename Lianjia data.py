@@ -118,51 +118,6 @@ def GetPages(url):
     
     return data
 
-    
-def PriceInfo(url,headers, cookies):
-    text = requests.get(url, headers=headers, cookies = cookies).text
-    soup = bs(text)
-    rooms =[i.text.strip().split('|')[0] for i in soup.findAll(name='div', attrs={'class':'houseInfo'})]
-    area = [float(i.text.strip().split('|')[1][:-3]) for i in soup.findAll(name='div', attrs={'class':'houseInfo'})]
-    direction = [i.text.strip().split('|')[2] for i in soup.findAll(name='div', attrs={'class':'houseInfo'})]
-    decoration = [i.text.strip().split('|')[3] for i in soup.findAll(name='div', attrs={'class':'houseInfo'})]
-    floor = [i.text.strip().split('|')[4] for i in soup.findAll(name='div', attrs={'class':'houseInfo'})]
-    year = [int(i.text.strip().split('|')[5][:-3].strip()) for i in soup.findAll(name='div', attrs={'class':'houseInfo'})]
-    buildingtype = [i.text.strip().split('|')[6] for i in soup.findAll(name='div', attrs={'class':'houseInfo'})]
-    price = [float(i.text[:-1]) for i in soup.findAll(name = 'div', attrs={'class':'totalPrice'})]
-    block =[i.text.strip() for i in soup.findAll(name='a', attrs={'data-el':'region'})]
-    return pd.DataFrame({'block':block,'rooms':rooms, 'area':area, 'price':price, 'direction':direction,'decoration':decoration,'floor':floor, 'year':year, 'building type':buildingtype})
-
-def UrlGenerator(block, pages):
-    
-    pageinfo =['']
-    url_list=[]
-    for i in range(1,pages+1):
-        pageinfo.append('pg'+str(i))
-    
-    url_part1 = r'https://bj.lianjia.com/chengjiao/'
-    if block == 'gjc':
-        for i in pageinfo:
-            url = url_part1+i+r'c1111027382441/?sug=%E4%B8%AD%E5%9B%BD%E9%93%81%E5%BB%BA%E5%9B%BD%E9%99%85%E5%9F%8E'
-            url_list.append(url)
-    elif block == 'rzgg':
-        for i in pageinfo:
-            url = url_part1+i+r'c1111045303586/?sug=润泽公馆'
-            url_list.append(url)        
-    elif block == 'hmc':
-        for i in pageinfo:
-            url = url_part1+i+r'c1111027375158rs华贸城/'
-            url_list.append(url) 
-    elif block == 'shbj':
-        for i in pageinfo:
-            url = url_part1+i+r'c1111041153546/?sug=世华泊郡'
-            url_list.append(url)
-    elif block == 'fxdd':
-        for i in pageinfo:
-            url = url_part1+i+r'c1111027379985/?sug=天润福熙大道'
-            url_list.append(url)        
-    return url_list
-
 def url_generator_for_all(url, pages):
     pageinfo = ['']
     url_list = []
@@ -180,103 +135,102 @@ def url_generator_for_all(url, pages):
         url_list.append(url+'pg2/')
     return url_list
         
-
-
-def Get_data_in_beiyuan():
-        # url = r'https://bj.lianjia.com/ershoufang/c1111027382441rs%E5%9B%BD%E9%99%85%E5%9F%8E/'
-    url_for_sale= r'https://bj.lianjia.com/ershoufang/c1111027382441/?sug=%E4%B8%AD%E5%9B%BD%E9%93%81%E5%BB%BA%E5%9B%BD%E9%99%85%E5%9F%8E'
-    url_historical = r'https://bj.lianjia.com/chengjiao/c1111027382441/?sug=%E4%B8%AD%E5%9B%BD%E9%93%81%E5%BB%BA%E5%9B%BD%E9%99%85%E5%9F%8E'
-
-    blocks ={
-        'gjc':13,
-        'rzgg':11,
-        'shbj':14,
-        'hmc':50,
-        'fxdd':9
-        }
-    
-    data =pd.DataFrame()
-    for block in blocks:
-        for i in UrlGenerator(block,blocks[block]):
-            pagedata = GetPages(i)
-            data = pd.concat([data,pagedata])
-            # data_list.append(data)
-    
-    
-    filename = 'lianjia historical data'+' '+ time.ctime().replace(':','_')+'.xlsx'
-    with pd.ExcelWriter(filename) as writer:
-        data.to_excel(writer, sheet_name = datetime.today().strftime('%Y-%m-%d'))
-
-def get_all_data(url_base):
+def get_region_links(url_base):
     soup_base = make_soup(url_base)
     #get the links in the historical page by region
     links_soup = soup_base.findAll(name ='div',attrs={'data-role':'ershoufang'})
     links = [i.get('href') for i in links_soup[0].find_all('a')]
     regions = [i.text for i in links_soup[0].find_all('a')]
     links_region = [url_base+i[11:] for i in links]
+    region_links = dict(zip(regions, links_region))
+    return region_links   
+
+def get_subregion_links(url_base,link):
+    region_soup = make_soup(link)
+    links_temp = region_soup.find_all(name ='div', attrs={'data-role':'ershoufang'})[0].find_all('div')[1].find_all('a')
+    links_subregion_short = [i.get('href') for i in links_temp]
+    links_subregion = [url_base+i[11:] for i in links_subregion_short]
+    subregions = [i.text for i in links_temp]
+    subregion_links = dict(zip(subregions,links_subregion))
+    return subregion_links    
+
+def get_regional_data(url_base,region, link):
+    data=pd.DataFrame()
+    # city = re.findall('https://(\w*).lianjia', url_base)[0]
+    # region =regions[links_region.index(link)]
+    subregion_links = get_subregion_links(url_base,link)
     
-    
-    data = pd.DataFrame()
-    # loop for every link in the region:
-    for link in links_region:
-        region =regions[links_region.index(link)]
-        region_soup = make_soup(link)
-        links_temp = region_soup.find_all(name ='div', attrs={'data-role':'ershoufang'})[0].find_all('div')[1].find_all('a')
-        links_subregion_short = [i.get('href') for i in links_temp]
-        links_subregion = [url_base+i[11:] for i in links_subregion_short]
-        subregions = [i.text for i in links_temp]
-        # loop for every sub-region in each region
-        for subregional_link in links_subregion:
-            sub_region = subregions[links_subregion.index(subregional_link)]
-            pages = get_page_number(subregional_link)
-            all_urls = url_generator_for_all(subregional_link,pages)
-            for i in all_urls:
-                pagedata = GetPages(i)
+    # loop for every sub-region in each region
+    for sub_region in subregion_links:
+        pages = get_page_number(subregion_links[sub_region])
+        all_urls = url_generator_for_all(subregion_links[sub_region],pages)
+        for i in all_urls:
+            pagedata = GetPages(i)
+            try:
                 pagedata.loc[:,'region']=region
                 pagedata.loc[:,'sub-region']=sub_region
-                data = pd.concat([data, pagedata]) 
+            except:
+                pass
+            data = pd.concat([data, pagedata]) 
+    # filename = 'lianjia historical data '+city+' '+region +' '+ datetime.now().strftime('%Y-%m-%d %H-%M-%S')+'.xlsx'
+    # with pd.ExcelWriter(filename) as writer:
+    #     data.to_excel(writer, sheet_name = region)    
+    
     return data
+
+    
+def get_all_data(url_base):
+    region_links =get_region_links(url_base)
+    # data = pd.DataFrame()
+    # loop for every link in the region:
+    for region in region_links:
+        get_regional_data(url_base,region,region_links[region])
+
+def city_name(url):
+    city_code = re.findall('https://(\w*).',url)[0]
+    if city_code == 'bj':
+        city='北京'
+    elif city_code == 'sh':
+        city ='上海'
+    elif city_code == 'cd':
+        city ='成都'
+    elif city_code == 'sz':
+        city = '深圳'
+    else:
+        city = 'unknown'
+    return city
     
 def main():
     url_base_beijing =r'https://bj.lianjia.com/chengjiao/'
     url_base_shanghai =r'https://sh.lianjia.com/chengjiao/'
     url_base_chengdu =r'https://cd.lianjia.com/chengjiao/'
     url_base_shenzhen =r'https://sz.lianjia.com/chengjiao/'
-
-    Beijing_data = get_all_data(url_base_beijing)
-    filename = 'lianjia historical data beijing all'+' '+ time.ctime().replace(':','_')+'.xlsx'
+    #data = get_all_data(url_base_beijing)
+    links = get_region_links(url_base_beijing)
+    city = city_name(url_base_beijing)
+    region = '朝阳'
+    # beijng valid regions:
+    #     东城
+    #     西城
+    #     朝阳
+    #     海淀
+    #     丰台
+    #     石景山
+    #     通州
+    #     昌平
+    #     大兴
+    #     亦庄开发区
+    #     顺义
+    #     房山
+    #     门头沟
+    #     平谷
+    #     怀柔
+    #     密云
+    #     延庆
+    data = get_regional_data(url_base_beijing,region,links[region])
+    filename = 'lianjia historical data '+city+' '+region +' '+ datetime.now().strftime('%Y-%m-%d %H-%M-%S')+'.xlsx'
     with pd.ExcelWriter(filename) as writer:
-        Beijing_data.to_excel(writer, sheet_name = datetime.today().strftime('%Y-%m-%d'))    
-
-    Shanghai_data = get_all_data(url_base_shanghai)
-    filename = 'lianjia historical data shanghai all'+' '+ time.ctime().replace(':','_')+'.xlsx'
-    with pd.ExcelWriter(filename) as writer:
-        Shanghai_data.to_excel(writer, sheet_name = datetime.today().strftime('%Y-%m-%d'))    
-    
-    Chengdu_data = get_all_data(url_base_chengdu)
-    filename = 'lianjia historical data shanghai all'+' '+ time.ctime().replace(':','_')+'.xlsx'
-    with pd.ExcelWriter(filename) as writer:
-        Chengdu_data.to_excel(writer, sheet_name = datetime.today().strftime('%Y-%m-%d'))    
-    
-    Shenzhen_data = get_all_data(url_base_shenzhen)
-    filename = 'lianjia historical data shanghai all'+' '+ time.ctime().replace(':','_')+'.xlsx'
-    with pd.ExcelWriter(filename) as writer:
-        Shenzhen_data.to_excel(writer, sheet_name = datetime.today().strftime('%Y-%m-%d'))    
-    
-    
-    
-    
-    # data=pd.DataFrame()
-    # for link in links_region:
-    #     region = link.split('/')[-2]
-    #     pages = get_page_number(link)
-    #     all_urls = url_generator_for_all(link,pages)
-    #     for i in all_urls:
-    #         pagedata = GetPages(i)
-    #         pagedata.loc[:,'region']=region
-    #         data = pd.concat([data,pagedata])
-
-
+        data.to_excel(writer, sheet_name = datetime.today().strftime('%Y-%m-%d'))    
 
 
 
