@@ -133,7 +133,7 @@ def get_deal_page_data_on_sale(url):
     try:
         area = basic_attrs[2].find("span",text='建筑面积').next_sibling
     except:
-        floor=None        
+        area =None        
     try:
         structure = basic_attrs[3].find("span",text='户型结构').next_sibling
     except:
