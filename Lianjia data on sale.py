@@ -133,7 +133,7 @@ def get_deal_page_data_on_sale(url):
     try:
         area = basic_attrs[2].find("span",text='建筑面积').next_sibling
     except:
-        area =None        
+        area=None        
     try:
         structure = basic_attrs[3].find("span",text='户型结构').next_sibling
     except:
@@ -271,9 +271,11 @@ def get_deal_page_data_on_sale(url):
     deal_info['交通出行']=transportation
     deal_info['房源链接']= url
 
-    
+    df=pd.DataFrame(list(deal_info.items())).T
+    df.columns=df.iloc[0]
+    df=df.iloc[1:,:]
 
-    return  pd.DataFrame(list(deal_info.items())).T
+    return  df
 
 def get_regional_data(url_base,region_name):
 
@@ -287,21 +289,21 @@ def get_regional_data(url_base,region_name):
             urls_in_a_page = get_deal_urls(link)
             for url in urls_in_a_page:
                 deal_data = get_deal_page_data_on_sale(url)
-                pd.concat([data,deal_data])
+                data =pd.concat([data,deal_data])
     return data
 
 def main():
 
     url_base_Beijing_on_sale = r'https://bj.lianjia.com/ershoufang/'
     region_of_interest = {
-        "朝阳":"chaoyang",
-        "丰台":"fengtai",
-        "石景山":"shijingshan",
-        "通州":"tongzhou",
-        "大兴":"daxing",
-        "亦庄":"yizhuangkaifaqu",
-        "房山":"fangshan",
-        "门头沟":"mentougou",
+        # "朝阳":"chaoyang",
+        # "丰台":"fengtai",
+        # "石景山":"shijingshan",
+        # "通州":"tongzhou",
+        # "大兴":"daxing",
+        # "亦庄":"yizhuangkaifaqu",
+        # "房山":"fangshan",
+        # "门头沟":"mentougou",
         "东城":"dongcheng",
         "西城":"xicheng",
         "海淀":"haidian"
@@ -324,7 +326,7 @@ def main():
     #         urls_in_a_page = get_deal_urls(link)
     #         for url in urls_in_a_page:
     #             deal_data = get_deal_page_data_on_sale(url)
-    #             pd.concat([data,deal_data])
+    #             data=pd.concat([data,deal_data])
     
     # data.to_excel('lianjia deals in dongcheng.xlsx')
 
