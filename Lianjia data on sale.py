@@ -3,6 +3,8 @@ import re
 import pandas as pd
 from bs4 import BeautifulSoup as bs
 from datetime import datetime
+
+from sqlalchemy import all_
 # import time
 # import random
 # import time
@@ -64,13 +66,17 @@ def get_region_links(url_base):
     return region_links
 
 def get_subregion_links(url_base, link):
-    # for each region (like Changyang),get the list of links for its sub-regions (like Laiguangyin)
+    '''
+    url_base
+    link = url_base + region_name
+    '''
+    #  for each region (like Changyang),get the list of links for its sub-regions (like Laiguangyin)
     region_soup = make_soup(link)
     try:
         links_temp = region_soup.find_all(name='div', attrs={'data-role': 'ershoufang'})[0].find_all('div')[1].find_all(
             'a')
         links_subregion_short = [i.get('href') for i in links_temp]
-        links_subregion = [url_base + i[11:] for i in links_subregion_short]
+        links_subregion = [url_base + i[12:] for i in links_subregion_short]
         subregions = [i.text for i in links_temp]
         subregion_links = dict(zip(subregions, links_subregion))
     except:
@@ -333,6 +339,9 @@ def get_deal_page_data_on_sale(url):
     df.columns=df.iloc[0]
     df=df.iloc[1:,:]
 
+    #remove duplicates
+    df.drop_duplicates(subset='房源链接',keep='first',inplace=True)
+
     return  df
 
 def get_regional_data(url_base,region_name):
@@ -340,14 +349,23 @@ def get_regional_data(url_base,region_name):
     sub_region_links = get_subregion_links(url_base, url_base+region_name)
     
     data=pd.DataFrame()
+    all_urls = []
+    sub_region_page_links=[]
 
     for key in sub_region_links:
-        sub_region_page_links = url_generator_for_all(sub_region_links[key],get_page_number(sub_region_links[key]))
+        temp_list = url_generator_for_all(sub_region_links[key],get_page_number(sub_region_links[key]))
+        sub_region_page_links.extend(temp_list)
         for link in sub_region_page_links:
             urls_in_a_page = get_deal_urls(link)
-            for url in urls_in_a_page:
-                deal_data = get_deal_page_data_on_sale(url)
-                data =pd.concat([data,deal_data])
+            all_urls.extend(urls_in_a_page)
+
+    #remove the duplicates       
+    all_urls = list(set(all_urls))
+
+    for url in all_urls:
+        deal_data = get_deal_page_data_on_sale(url)
+        data =pd.concat([data,deal_data])
+
     return data
 
 def get_regional_data_with_criteria(url_base,region_name,*args):
@@ -389,25 +407,36 @@ def main():
     url_base_Beijing_on_sale = r'https://bj.lianjia.com/ershoufang/'
     
     region_of_interest = {
-        # "朝阳":"chaoyang",
-        # "丰台":"fengtai",
-        # "石景山":"shijingshan",
-        # "通州":"tongzhou",
-        # "大兴":"daxing",
-        # "亦庄":"yizhuangkaifaqu",
-        # "房山":"fangshan",
-        # "门头沟":"mentougou",
+        "延庆":"yanqing",
+        "密云":"miyun",
+        "怀柔":"huairou",
+        "平谷":"pinggu",
+        "昌平":"changping",
+        "顺义":"shunyi",
+        "朝阳":"chaoyang",
+        "丰台":"fengtai",
+        "石景山":"shijingshan",
+        "通州":"tongzhou",
+        "大兴":"daxing",
+        "亦庄":"yizhuangkaifaqu",
+        "房山":"fangshan",
+        "门头沟":"mentougou",
         "东城":"dongcheng",
         "西城":"xicheng",
         "海淀":"haidian"
 
     }
 
+    all_beijing_data = pd.DataFrame()
+
     for key in region_of_interest:
         regional_data = get_regional_data(url_base_Beijing_on_sale,region_of_interest[key])
         # regional_data = get_regional_data_with_criteria(url_base_Beijing_on_sale,region_of_interest[key],'New','One_bedroom')
         regional_data.to_excel('Lianjia housing market data for'+key+'.xlsx')
-
+        all_beijing_data=pd.concat([all_beijing_data,regional_data])
+    
+    
+    all_beijing_data.to_excel('Lianjia all Beijing housing market data.xlsx')
     # data = get_data_for_recent_one_bedroom()
     # data.to_excel('Lianjia recent data for one bedroom.xlsx')
 
