@@ -153,7 +153,7 @@ def get_deal_page_data_on_sale(url):
     try:
         price = float(page_soup.find_all(name='span', attrs={'class': 'total'})[0].text)
     except:
-        price = page_soup.find_all(name='span', attrs={'class': 'total'})[0].text
+        price = None
 
     try: 
         unit_price = page_soup.find_all(name='span', attrs={'class': 'unitPriceValue'})[0].text
@@ -432,11 +432,15 @@ def main():
     for key in region_of_interest:
         regional_data = get_regional_data(url_base_Beijing_on_sale,region_of_interest[key])
         # regional_data = get_regional_data_with_criteria(url_base_Beijing_on_sale,region_of_interest[key],'New','One_bedroom')
-        regional_data.to_excel('Lianjia housing market data for'+key+'.xlsx')
+        regional_data.to_excel('Lianjia housing market data for '+key+'.xlsx')
         all_beijing_data=pd.concat([all_beijing_data,regional_data])
     
     
     all_beijing_data.to_excel('Lianjia all Beijing housing market data.xlsx')
+   
+   
+   
+   
     # data = get_data_for_recent_one_bedroom()
     # data.to_excel('Lianjia recent data for one bedroom.xlsx')
 
