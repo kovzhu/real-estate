@@ -162,7 +162,7 @@ def get_deal_page_data_on_sale(url):
     try:
         around_info = page_soup.find_all(name='div', attrs={'class': 'aroundInfo'})[0]
     except:
-        around_info = page_soup.find_all(name='div', attrs={'class': 'aroundInfo'})[0]
+        around_info = None
     try:    
         block_name = around_info.find_all(name='a',attrs={'target':'_blank','class':'info'})[0].text
     except:
