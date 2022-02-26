@@ -14,10 +14,12 @@ from datetime import datetime
 def make_soup(url):
     # parse a html page for analysi with bs4
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.129 Safari/537.36'}
-    cookies = {
-        'Cookie': 'BAIDUID=A467EBC2C2D0C1F5CE71C86F2D851B89:FG=1; PSTM=1569895226; BIDUPSID=9BD73512109ADEBC79D0E6031A361FF2; ab_jid=3401447befc2a1f1fb58e1332e7a70a45049; ab_jid=3401447befc2a1f1fb58e1332e7a70a45049; ab_jid_BFESS=3401447befc2a1f1fb58e1332e7a70a45049; BDORZ=B490B5EBF6F3CD402E515D22BCDA1598'}
-    text = requests.get(url, headers=headers, cookies=cookies, verify=False).text
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.129 Safari/537.36',
+        'Cookie': 'lianjia_uuid=e2edd406-894e-4a9d-a490-7f075aff39f7; UM_distinctid=17e32d2927117-018ec5b8f9091d-f791b31-e1000-17e32d292737f; _smt_uid=61d7c33e.4ba9cfc4; _ga=GA1.2.1838195870.1641530191; sensorsdata2015jssdkcross=%7B%22distinct_id%22%3A%2217e32d596505fb-0b2bb82c48bc9f-f791b31-2073600-17e32d59651499%22%2C%22%24device_id%22%3A%2217e32d596505fb-0b2bb82c48bc9f-f791b31-2073600-17e32d59651499%22%2C%22props%22%3A%7B%22%24latest_traffic_source_type%22%3A%22%E7%9B%B4%E6%8E%A5%E6%B5%81%E9%87%8F%22%2C%22%24latest_referrer%22%3A%22%22%2C%22%24latest_referrer_host%22%3A%22%22%2C%22%24latest_search_keyword%22%3A%22%E6%9C%AA%E5%8F%96%E5%88%B0%E5%80%BC_%E7%9B%B4%E6%8E%A5%E6%89%93%E5%BC%80%22%7D%7D; _gid=GA1.2.1765217636.1645677395; _jzqc=1; Hm_lvt_9152f8221cb6243a53c83b956842be8a=1645677407,1645690672,1645758364; select_city=110000; _jzqx=1.1645681873.1645764687.4.jzqsr=bj%2Elianjia%2Ecom|jzqct=/ershoufang/andingmen/.jzqsr=bj%2Elianjia%2Ecom|jzqct=/ershoufang/dianmen/tt2l1/; _jzqckmp=1; lianjia_ssid=32ba4ba8-7158-40f5-9672-fec1c15a61ab; _jzqa=1.2192555456837514500.1641530184.1645764687.1645770475.12; Hm_lpvt_9152f8221cb6243a53c83b956842be8a=1645770944; _jzqb=1.6.10.1645770475.1',
+        'Referer':'https://bj.lianjia.com/',
+        'Connection':'keep-alive'
+        }
+    text = requests.get(url, headers=headers, verify=True).text
     soup = bs(text, features='lxml')
     return soup
 
@@ -74,6 +76,56 @@ def get_subregion_links(url_base, link):
     except:
         subregion_links = {'N/A': link}
     return subregion_links
+
+def get_subregion_links_with_criteria(url_base, region_name, *args):
+    
+    '''
+    Criteria include: New, One_bedroom
+    for each region (like Changyang),get the list of links for its sub-regions (like Laiguangyin)
+    
+    '''
+
+    Criteria ={
+        'New':'tt2',
+        'One_bedroom':'l1'
+    }
+
+    # Set a default criteria if there's no input
+    if len(args)==0:
+        args = Criteria
+    else:
+        args = args
+
+    #Create the string for the criteria to be used in url
+
+    args_in_url = [Criteria[arg] for arg in args] 
+
+    arg_string=str()
+
+    for arg in args_in_url:
+        arg_string=arg_string + str(arg)
+
+    # Create the link of the subregion
+    link = url_base + str(region_name)
+    region_soup = make_soup(link)
+
+    try:
+        links_temp = region_soup.find_all(name='div', attrs={'data-role': 'ershoufang'})[0].find_all('div')[1].find_all(
+            'a')
+        links_subregion_short = [i.get('href') for i in links_temp]
+        links_subregion = [url_base + i[11:] for i in links_subregion_short]
+        subregions = [i.text for i in links_temp]
+        subregion_links = dict(zip(subregions, links_subregion))
+    except:
+        subregion_links = {'N/A': link}
+    
+    # Add criteria to the subregion links
+    sub_region_links_with_criteria=dict()
+    for key in subregion_links:
+        sub_region_links_with_criteria[key]=subregion_links[key]+arg_string+'/'
+    
+    return sub_region_links_with_criteria
+
 
 def get_deal_urls(sub_region_url):
     #get the list of urls for a page in the sub-region page
@@ -234,12 +286,18 @@ def get_deal_page_data_on_sale(url):
         transportation = page_soup.find_all(name='div', attrs={'class': 'content'})[9].text.strip()
     except:
         transportation=None        
+    try:
+        unit_price_in_w = float(unit_price[:-4])
+    except:
+        unit_price_in_w=None
+
 
     #summary
     deal_info = {}
 
     deal_info['房屋价格']=price
     deal_info['房屋单价']=unit_price
+    deal_info['单价万元'] = unit_price_in_w
     deal_info['小区名称']=block_name
     deal_info['所在区域']= region
     deal_info['小区位置']= sub_region
@@ -292,9 +350,44 @@ def get_regional_data(url_base,region_name):
                 data =pd.concat([data,deal_data])
     return data
 
+def get_regional_data_with_criteria(url_base,region_name,*args):
+    '''
+    Region_name: string of the region, such as 'dongcheng'
+
+    '''
+
+    sub_region_links = get_subregion_links_with_criteria(url_base, region_name,*args)
+    
+    data=pd.DataFrame()
+
+    for key in sub_region_links:
+        sub_region_page_links = url_generator_for_all(sub_region_links[key],get_page_number(sub_region_links[key]))
+        for link in sub_region_page_links:
+            urls_in_a_page = get_deal_urls(link)
+            for url in urls_in_a_page:
+                deal_data = get_deal_page_data_on_sale(url)
+                data =pd.concat([data,deal_data])
+    return data
+
+
+def get_data_for_recent_one_bedroom():
+    url = 'https://bj.lianjia.com/ershoufang/tt2l1/' 
+    page = get_page_number(url)
+    data = pd.DataFrame()
+    page_links = url_generator_for_all(url,page)
+    
+    for link in page_links:
+        urls_in_a_page = get_deal_urls(link)
+        for url in urls_in_a_page:
+            deal_data = get_deal_page_data_on_sale(url)
+            data= pd.concat([data,deal_data])
+    return data
+
+
 def main():
 
     url_base_Beijing_on_sale = r'https://bj.lianjia.com/ershoufang/'
+    
     region_of_interest = {
         # "朝阳":"chaoyang",
         # "丰台":"fengtai",
@@ -312,23 +405,12 @@ def main():
 
     for key in region_of_interest:
         regional_data = get_regional_data(url_base_Beijing_on_sale,region_of_interest[key])
+        # regional_data = get_regional_data_with_criteria(url_base_Beijing_on_sale,region_of_interest[key],'New','One_bedroom')
         regional_data.to_excel('Lianjia housing market data for'+key+'.xlsx')
 
+    # data = get_data_for_recent_one_bedroom()
+    # data.to_excel('Lianjia recent data for one bedroom.xlsx')
 
-
-    # sub_region_links = get_subregion_links(url_base_Beijing_on_sale, url_base_Beijing_on_sale+'dongcheng')
-    
-    # data=pd.DataFrame()
-
-    # for key in sub_region_links:
-    #     sub_region_page_links = url_generator_for_all(sub_region_links[key],get_page_number(sub_region_links[key]))
-    #     for link in sub_region_page_links:
-    #         urls_in_a_page = get_deal_urls(link)
-    #         for url in urls_in_a_page:
-    #             deal_data = get_deal_page_data_on_sale(url)
-    #             data=pd.concat([data,deal_data])
-    
-    # data.to_excel('lianjia deals in dongcheng.xlsx')
 
 
 
