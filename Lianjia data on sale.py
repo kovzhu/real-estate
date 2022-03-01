@@ -4,7 +4,7 @@ import pandas as pd
 from bs4 import BeautifulSoup as bs
 from datetime import datetime
 
-from sqlalchemy import all_
+# from sqlalchemy import all_
 # import time
 # import random
 # import time
@@ -21,7 +21,8 @@ def make_soup(url):
         'Referer':'https://bj.lianjia.com/',
         'Connection':'keep-alive'
         }
-    text = requests.get(url, headers=headers, verify=True).text
+    # text = requests.get(url, headers=headers,verify=False).text
+    text = requests.get(url, headers=headers,verify=True).text
     soup = bs(text, features='lxml')
     return soup
 
@@ -349,23 +350,29 @@ def get_regional_data(url_base,region_name):
     sub_region_links = get_subregion_links(url_base, url_base+region_name)
     
     data=pd.DataFrame()
-    all_urls = []
-    sub_region_page_links=[]
+    # all_urls = []
+    # sub_region_page_links=[]
+    
 
     for key in sub_region_links:
-        temp_list = url_generator_for_all(sub_region_links[key],get_page_number(sub_region_links[key]))
-        sub_region_page_links.extend(temp_list)
+        # temp_list = url_generator_for_all(sub_region_links[key],get_page_number(sub_region_links[key]))
+        # sub_region_page_links.extend(temp_list)
+        sub_region_page_links = url_generator_for_all(sub_region_links[key],get_page_number(sub_region_links[key]))
         for link in sub_region_page_links:
+            print("Getting data from link: "+ link)
             urls_in_a_page = get_deal_urls(link)
-            all_urls.extend(urls_in_a_page)
+            for url in urls_in_a_page:
+                deal_data= get_deal_page_data_on_sale(url)
+                data = pd.concat([data,deal_data])
 
     #remove the duplicates       
-    all_urls = list(set(all_urls))
+    # all_urls = list(set(all_urls))
 
-    for url in all_urls:
-        deal_data = get_deal_page_data_on_sale(url)
-        data =pd.concat([data,deal_data])
-
+    # for url in all_urls:
+        # deal_data = get_deal_page_data_on_sale(url)
+        # data =pd.concat([data,deal_data])
+    data.drop_duplicates(subset='房源链接',keep='first',inplace=True)
+    
     return data
 
 def get_regional_data_with_criteria(url_base,region_name,*args):
@@ -383,6 +390,7 @@ def get_regional_data_with_criteria(url_base,region_name,*args):
         for link in sub_region_page_links:
             urls_in_a_page = get_deal_urls(link)
             for url in urls_in_a_page:
+                print('Getting data from '+url)
                 deal_data = get_deal_page_data_on_sale(url)
                 data =pd.concat([data,deal_data])
     return data
@@ -407,14 +415,14 @@ def main():
     url_base_Beijing_on_sale = r'https://bj.lianjia.com/ershoufang/'
     
     region_of_interest = {
-        "延庆":"yanqing",
-        "密云":"miyun",
-        "怀柔":"huairou",
-        "平谷":"pinggu",
-        "昌平":"changping",
-        "顺义":"shunyi",
-        "朝阳":"chaoyang",
-        "丰台":"fengtai",
+        # "延庆":"yanqing",
+        # "密云":"miyun",
+        # "怀柔":"huairou",
+        # "平谷":"pinggu",
+        # "昌平":"changping",
+        # "顺义":"shunyi",
+        
+        
         "石景山":"shijingshan",
         "通州":"tongzhou",
         "大兴":"daxing",
@@ -423,7 +431,9 @@ def main():
         "门头沟":"mentougou",
         "东城":"dongcheng",
         "西城":"xicheng",
-        "海淀":"haidian"
+        "海淀":"haidian",
+        "丰台":"fengtai",
+        "朝阳":"chaoyang"
 
     }
 
